@@ -372,7 +372,7 @@
 
       window[callbackName] = () => finish(window.AMap ? null : new Error("AMap unavailable"));
       script.onerror = () => finish(new Error("Could not load AMap"));
-      const plugins = "AMap.ToolBar,AMap.Scale,AMap.Geolocation,AMap.Geocoder";
+      const plugins = "AMap.ToolBar,AMap.Scale,AMap.Geolocation,AMap.Geocoder,AMap.PlaceSearch";
       script.src = `https://webapi.amap.com/maps?v=2.0&key=${encodeURIComponent(config.amapKey)}&plugin=${plugins}&callback=${callbackName}`;
       document.head.appendChild(script);
     });
@@ -380,8 +380,8 @@
 
   function initMap(AMap) {
     state.map = new AMap.Map("map", {
-      zoom: Number(config.defaultZoom) || 11,
-      center: config.defaultCenter || [121.4737, 31.2304],
+      zoom: Number(config.defaultZoom) || 12,
+      center: config.defaultCenter || [113.884, 22.555],
       mapStyle: "amap://styles/light",
       viewMode: "2D",
       showIndoorMap: false
@@ -394,19 +394,30 @@
 
   async function geocodeMissingPlaces() {
     if (!state.map || !window.AMap) return;
-    const missing = state.places.filter((place) => !validLngLat(place.lng, place.lat) && place.address !== "地址待补充").slice(0, 40);
+    const missing = state.places.filter((place) => !validLngLat(place.lng, place.lat) && place.address !== "地址待补充").slice(0, 60);
     if (!missing.length) return;
     const geocoder = new AMap.Geocoder({ city: "全国", batch: false });
+    const placeSearch = new AMap.PlaceSearch({ city: "深圳", citylimit: false, pageSize: 3, extensions: "base" });
 
     async function geocode(place) {
       return new Promise((resolve) => {
-        geocoder.getLocation(`${place.city || ""}${place.address}`, (status, result) => {
-          if (status === "complete" && result.geocodes && result.geocodes[0]) {
-            const location = result.geocodes[0].location;
-            place.lng = location.lng;
-            place.lat = location.lat;
+        placeSearch.search(`${place.name} ${place.address}`, (searchStatus, searchResult) => {
+          const pois = searchStatus === "complete" && searchResult.poiList && searchResult.poiList.pois;
+          const poi = pois && pois[0];
+          if (poi && poi.location) {
+            place.lng = poi.location.lng;
+            place.lat = poi.location.lat;
+            resolve();
+            return;
           }
-          resolve();
+          geocoder.getLocation(`${place.city || ""}${place.address}`, (status, result) => {
+            if (status === "complete" && result.geocodes && result.geocodes[0]) {
+              const location = result.geocodes[0].location;
+              place.lng = location.lng;
+              place.lat = location.lat;
+            }
+            resolve();
+          });
         });
       });
     }
@@ -414,6 +425,32 @@
     for (let index = 0; index < missing.length; index += 3) {
       await Promise.all(missing.slice(index, index + 3).map(geocode));
     }
+  }
+
+  function loadBundledPlaces() {
+    const rows = window.DELICIOUS_FOOD_MAP_DATA;
+    if (!Array.isArray(rows) || !rows.length) return null;
+    return rows.map((place, index) => {
+      const category = String(place.category || "其他美味").trim();
+      const lng = Number(place.lng);
+      const lat = Number(place.lat);
+      return {
+        id: `csv-${index}-${slug(place.name)}`,
+        name: String(place.name || "").trim(),
+        category,
+        address: String(place.address || "地址待补充").trim(),
+        city: String(place.city || "深圳").trim(),
+        lng: validLngLat(lng, lat) ? lng : null,
+        lat: validLngLat(lng, lat) ? lat : null,
+        rating: Number.isFinite(Number(place.rating)) && Number(place.rating) > 0 ? Number(place.rating) : null,
+        price: Number.isFinite(Number(place.price)) && Number(place.price) > 0 ? Number(place.price) : null,
+        dish: String(place.dish || "到店慢慢发现").trim(),
+        note: String(place.note || "来自深圳宝安美食推荐清单。").trim(),
+        link: String(place.link || "").trim(),
+        emoji: emojiFor(category),
+        raw: place
+      };
+    }).filter((place) => place.name);
   }
 
   function setSourceStatus(type, text) {
@@ -613,19 +650,25 @@
       elements.placeList.innerHTML = `<div class="list-loading"><span class="loader"></span><p>正在翻阅大家的美食清单…</p></div>`;
       setSourceStatus("", "正在读取清单");
     }
-    try {
-      state.places = await loadGoogleSheet();
-      setSourceStatus("live", "Google Sheet 已同步");
-    } catch (error) {
-      console.warn("Using bundled demo data:", error);
-      state.places = fallbackPlaces.map((place, index) => ({
-        ...place,
-        id: `demo-${index}-${slug(place.name)}`,
-        emoji: emojiFor(place.category),
-        link: ""
-      }));
-      setSourceStatus("fallback", "演示数据 · 表格暂不可用");
-      showToast("共享表格暂不可用，已载入演示地点");
+    const bundledPlaces = loadBundledPlaces();
+    if (bundledPlaces) {
+      state.places = bundledPlaces;
+      setSourceStatus("live", `宝安 CSV · ${bundledPlaces.length} 家`);
+    } else {
+      try {
+        state.places = await loadGoogleSheet();
+        setSourceStatus("live", "Google Sheet 已同步");
+      } catch (error) {
+        console.warn("Using bundled demo data:", error);
+        state.places = fallbackPlaces.map((place, index) => ({
+          ...place,
+          id: `demo-${index}-${slug(place.name)}`,
+          emoji: emojiFor(place.category),
+          link: ""
+        }));
+        setSourceStatus("fallback", "演示数据 · 表格暂不可用");
+        showToast("共享表格暂不可用，已载入演示地点");
+      }
     }
     updateStats();
     renderFilters();
