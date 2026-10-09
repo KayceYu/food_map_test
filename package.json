@@ -1,0 +1,16 @@
+{
+  "name": "delicious-food-map",
+  "version": "1.0.0",
+  "private": true,
+  "description": "A self-contained AMap-powered food discovery app backed by Google Sheets.",
+  "scripts": {
+    "dev": "node server.js",
+    "start": "node server.js",
+    "build": "node scripts/build.mjs",
+    "check": "node scripts/check.mjs"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "MIT"
+}

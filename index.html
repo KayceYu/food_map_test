@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#f7f2e8" />
+    <meta
+      name="description"
+      content="从共享清单里发现值得专程去吃的小店。"
+    />
+    <title>好味地图 · Delicious Food Map</title>
+    <link rel="preconnect" href="https://webapi.amap.com" />
+    <link rel="preconnect" href="https://docs.google.com" />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <a class="brand" href="#" aria-label="好味地图首页">
+          <span class="brand-mark" aria-hidden="true">味</span>
+          <span>
+            <strong>好味地图</strong>
+            <small>DELICIOUS FOOD MAP</small>
+          </span>
+        </a>
+
+        <div class="topbar-actions">
+          <span class="source-pill" id="sourcePill">
+            <i aria-hidden="true"></i>
+            <span id="sourceLabel">正在读取清单</span>
+          </span>
+          <button class="icon-button" id="refreshButton" type="button" aria-label="刷新清单" title="刷新清单">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8.1 8.1 0 0 0-15.5-2M4 4v5h5M4 13a8.1 8.1 0 0 0 15.5 2M20 20v-5h-5" /></svg>
+          </button>
+          <button class="text-button" id="locateButton" type="button">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3" /><path d="M12 2v3M12 19v3M2 12h3M19 12h3" /></svg>
+            找到我
+          </button>
+        </div>
+      </header>
+
+      <main>
+        <section class="hero" aria-labelledby="heroTitle">
+          <div class="hero-copy">
+            <p class="eyebrow">一张认真吃饭的地图</p>
+            <h1 id="heroTitle">下一口，<em>去哪里？</em></h1>
+            <p class="hero-description">从大家的私藏清单里，找到真正值得绕路去吃的那一家。</p>
+          </div>
+          <div class="hero-stats" aria-label="清单统计">
+            <span><strong id="placeCount">—</strong> 家好店</span>
+            <span><strong id="categoryCount">—</strong> 种风味</span>
+            <span><strong id="cityCount">—</strong> 座城市</span>
+          </div>
+        </section>
+
+        <section class="search-section" aria-label="搜索与筛选">
+          <label class="search-box" for="searchInput">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="m20 20-4-4" /></svg>
+            <input id="searchInput" type="search" autocomplete="off" placeholder="搜店名、风味、地址或推荐菜…" />
+            <kbd>⌘ K</kbd>
+          </label>
+          <div class="filters" id="categoryFilters" aria-label="按风味筛选"></div>
+        </section>
+
+        <section class="content-grid">
+          <aside class="places-panel" aria-label="美食地点列表">
+            <div class="panel-heading">
+              <div>
+                <p class="panel-kicker">TASTING NOTES</p>
+                <h2>值得专程去吃</h2>
+              </div>
+              <span id="resultCount">0 家</span>
+            </div>
+            <div class="place-list" id="placeList" aria-live="polite">
+              <div class="list-loading">
+                <span class="loader"></span>
+                <p>正在翻阅大家的美食清单…</p>
+              </div>
+            </div>
+          </aside>
+
+          <section class="map-panel" aria-label="美食地图">
+            <div id="map" role="application" aria-label="高德地图"></div>
+            <div class="map-fallback" id="mapFallback" hidden>
+              <span>🗺️</span>
+              <strong>地图暂时没有加载出来</strong>
+              <p>请检查高德 Web JS API Key 的域名白名单，然后刷新页面。</p>
+            </div>
+            <div class="map-legend">
+              <span><i class="legend-dot"></i> 清单地点</span>
+              <button type="button" id="fitMapButton">显示全部</button>
+            </div>
+          </section>
+        </section>
+      </main>
+    </div>
+
+    <div class="scrim" id="scrim" hidden></div>
+    <aside class="detail-drawer" id="detailDrawer" aria-hidden="true" aria-label="地点详情">
+      <button class="drawer-close" id="drawerClose" type="button" aria-label="关闭详情">×</button>
+      <div id="drawerContent"></div>
+    </aside>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+    <script src="./config.js"></script>
+    <script src="./app.js"></script>
+  </body>
+</html>
