@@ -430,18 +430,25 @@
   function loadBundledPlaces() {
     const rows = window.DELICIOUS_FOOD_MAP_DATA;
     if (!Array.isArray(rows) || !rows.length) return null;
+    const coordinateRows = Array.isArray(window.DELICIOUS_FOOD_MAP_COORDINATES)
+      ? window.DELICIOUS_FOOD_MAP_COORDINATES
+      : [];
+    const coordinatesByName = new Map(coordinateRows.map((item) => [String(item.name || "").trim(), item]));
     return rows.map((place, index) => {
       const category = String(place.category || "其他美味").trim();
-      const lng = Number(place.lng);
-      const lat = Number(place.lat);
+      const name = String(place.name || "").trim();
+      const coordinates = coordinatesByName.get(name) || place;
+      const lng = Number(coordinates.lng);
+      const lat = Number(coordinates.lat);
       return {
         id: `csv-${index}-${slug(place.name)}`,
-        name: String(place.name || "").trim(),
+        name,
         category,
         address: String(place.address || "地址待补充").trim(),
         city: String(place.city || "深圳").trim(),
         lng: validLngLat(lng, lat) ? lng : null,
         lat: validLngLat(lng, lat) ? lat : null,
+        locationPrecision: String(coordinates.precision || place.locationPrecision || "exact"),
         rating: Number.isFinite(Number(place.rating)) && Number(place.rating) > 0 ? Number(place.rating) : null,
         price: Number.isFinite(Number(place.price)) && Number(place.price) > 0 ? Number(place.price) : null,
         dish: String(place.dish || "到店慢慢发现").trim(),
@@ -529,7 +536,7 @@
     state.filtered.forEach((place, index) => {
       if (!validLngLat(place.lng, place.lat)) return;
       const markerElement = document.createElement("div");
-      markerElement.className = `food-marker ${state.selectedId === place.id ? "is-active" : ""}`;
+      markerElement.className = `food-marker ${place.locationPrecision === "approximate" ? "is-approximate" : ""} ${state.selectedId === place.id ? "is-active" : ""}`;
       markerElement.innerHTML = `<span>${index + 1}</span>`;
       const marker = new AMap.Marker({
         position: [place.lng, place.lat],
@@ -587,7 +594,11 @@
       </div>
       <div class="drawer-section"><span>必点这一口</span><p>${escapeHtml(place.dish)}</p></div>
       <div class="drawer-section"><span>为什么值得去</span><p>${escapeHtml(place.note)}</p></div>
-      <div class="drawer-section"><span>地址</span><p>${escapeHtml(place.address)}</p></div>
+      <div class="drawer-section">
+        <span>地址</span>
+        <p>${escapeHtml(place.address)}</p>
+        ${place.locationPrecision === "approximate" ? '<small class="location-precision">地图标记为附近参考位置，请以店铺地址为准。</small>' : ""}
+      </div>
       <div class="drawer-actions">
         <button type="button" class="${saved ? "is-saved" : ""}" data-drawer-favorite="${escapeHtml(place.id)}">${saved ? "♥ 已收藏" : "♡ 收进口袋"}</button>
         <a href="${escapeHtml(place.link || destination)}" target="_blank" rel="noopener noreferrer">去高德导航 ↗</a>

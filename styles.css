@@ -661,6 +661,11 @@ a:focus-visible {
   transform: rotate(45deg);
 }
 
+.food-marker.is-approximate {
+  border-style: dashed;
+  opacity: 0.82;
+}
+
 .food-marker.is-active {
   background: var(--ink);
   transform: rotate(-45deg) scale(1.22);
@@ -850,6 +855,14 @@ a:focus-visible {
   color: #5f594e;
   font-size: 13px;
   line-height: 1.85;
+}
+
+.location-precision {
+  display: block;
+  margin-top: 8px;
+  color: var(--accent);
+  font-size: 11px;
+  line-height: 1.6;
 }
 
 .drawer-actions {
