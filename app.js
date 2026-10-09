@@ -144,7 +144,6 @@
     markers: new Map(),
     selectedId: null,
     favorites: loadFavorites(),
-    infoWindow: null,
     toastTimer: null
   };
 
@@ -262,6 +261,37 @@
     return Number.isFinite(lng) && Number.isFinite(lat) && Math.abs(lng) <= 180 && Math.abs(lat) <= 90;
   }
 
+  function gcj02ToWgs84(lng, lat) {
+    if (lng < 72.004 || lng > 137.8347 || lat < 0.8293 || lat > 55.8271) return [lng, lat];
+
+    const transformLat = (x, y) => {
+      let value = -100 + 2 * x + 3 * y + 0.2 * y * y + 0.1 * x * y + 0.2 * Math.sqrt(Math.abs(x));
+      value += (20 * Math.sin(6 * x * Math.PI) + 20 * Math.sin(2 * x * Math.PI)) * 2 / 3;
+      value += (20 * Math.sin(y * Math.PI) + 40 * Math.sin(y / 3 * Math.PI)) * 2 / 3;
+      value += (160 * Math.sin(y / 12 * Math.PI) + 320 * Math.sin(y * Math.PI / 30)) * 2 / 3;
+      return value;
+    };
+    const transformLng = (x, y) => {
+      let value = 300 + x + 2 * y + 0.1 * x * x + 0.1 * x * y + 0.1 * Math.sqrt(Math.abs(x));
+      value += (20 * Math.sin(6 * x * Math.PI) + 20 * Math.sin(2 * x * Math.PI)) * 2 / 3;
+      value += (20 * Math.sin(x * Math.PI) + 40 * Math.sin(x / 3 * Math.PI)) * 2 / 3;
+      value += (150 * Math.sin(x / 12 * Math.PI) + 300 * Math.sin(x / 30 * Math.PI)) * 2 / 3;
+      return value;
+    };
+
+    const earthRadius = 6378245;
+    const eccentricity = 0.006693421622965943;
+    const radLat = lat / 180 * Math.PI;
+    let magic = Math.sin(radLat);
+    magic = 1 - eccentricity * magic * magic;
+    const sqrtMagic = Math.sqrt(magic);
+    const latitudeDelta = transformLat(lng - 105, lat - 35) * 180
+      / ((earthRadius * (1 - eccentricity)) / (magic * sqrtMagic) * Math.PI);
+    const longitudeDelta = transformLng(lng - 105, lat - 35) * 180
+      / (earthRadius / sqrtMagic * Math.cos(radLat) * Math.PI);
+    return [lng * 2 - (lng + longitudeDelta), lat * 2 - (lat + latitudeDelta)];
+  }
+
   function slug(value) {
     return String(value)
       .toLowerCase()
@@ -348,83 +378,21 @@
     });
   }
 
-  function loadAMap() {
-    return new Promise((resolve, reject) => {
-      if (window.AMap) {
-        resolve(window.AMap);
-        return;
-      }
-      if (!config.amapKey) {
-        reject(new Error("Missing AMap key"));
-        return;
-      }
-
-      window._AMapSecurityConfig = { securityJsCode: config.amapSecurityCode || "" };
-      const script = document.createElement("script");
-      const callbackName = `__dfmAMap_${Date.now()}`;
-      const timeout = window.setTimeout(() => finish(new Error("AMap request timed out")), 15000);
-
-      function finish(error) {
-        window.clearTimeout(timeout);
-        delete window[callbackName];
-        error ? reject(error) : resolve(window.AMap);
-      }
-
-      window[callbackName] = () => finish(window.AMap ? null : new Error("AMap unavailable"));
-      script.onerror = () => finish(new Error("Could not load AMap"));
-      const plugins = "AMap.ToolBar,AMap.Scale,AMap.Geolocation,AMap.Geocoder,AMap.PlaceSearch";
-      script.src = `https://webapi.amap.com/maps?v=2.0&key=${encodeURIComponent(config.amapKey)}&plugin=${plugins}&callback=${callbackName}`;
-      document.head.appendChild(script);
-    });
-  }
-
-  function initMap(AMap) {
-    state.map = new AMap.Map("map", {
-      zoom: Number(config.defaultZoom) || 12,
-      center: config.defaultCenter || [113.884, 22.555],
-      mapStyle: "amap://styles/light",
-      viewMode: "2D",
-      showIndoorMap: false
-    });
-    state.map.addControl(new AMap.ToolBar({ position: { top: "18px", right: "18px" } }));
-    state.map.addControl(new AMap.Scale());
-    state.infoWindow = new AMap.InfoWindow({ offset: new AMap.Pixel(0, -38), isCustom: false });
+  function initMap() {
+    if (!window.L) throw new Error("Leaflet unavailable");
+    const center = config.defaultCenter || [113.884, 22.555];
+    const [centerLng, centerLat] = gcj02ToWgs84(Number(center[0]), Number(center[1]));
+    state.map = L.map("map", { zoomControl: false }).setView(
+      [centerLat, centerLng],
+      Number(config.defaultZoom) || 12
+    );
+    L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 19,
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>'
+    }).addTo(state.map);
+    L.control.zoom({ position: "topright" }).addTo(state.map);
+    L.control.scale({ imperial: false }).addTo(state.map);
     elements.mapFallback.hidden = true;
-  }
-
-  async function geocodeMissingPlaces() {
-    if (!state.map || !window.AMap) return;
-    const missing = state.places.filter((place) => !validLngLat(place.lng, place.lat) && place.address !== "地址待补充").slice(0, 60);
-    if (!missing.length) return;
-    const geocoder = new AMap.Geocoder({ city: "全国", batch: false });
-    const placeSearch = new AMap.PlaceSearch({ city: "深圳", citylimit: false, pageSize: 3, extensions: "base" });
-
-    async function geocode(place) {
-      return new Promise((resolve) => {
-        placeSearch.search(`${place.name} ${place.address}`, (searchStatus, searchResult) => {
-          const pois = searchStatus === "complete" && searchResult.poiList && searchResult.poiList.pois;
-          const poi = pois && pois[0];
-          if (poi && poi.location) {
-            place.lng = poi.location.lng;
-            place.lat = poi.location.lat;
-            resolve();
-            return;
-          }
-          geocoder.getLocation(`${place.city || ""}${place.address}`, (status, result) => {
-            if (status === "complete" && result.geocodes && result.geocodes[0]) {
-              const location = result.geocodes[0].location;
-              place.lng = location.lng;
-              place.lat = location.lat;
-            }
-            resolve();
-          });
-        });
-      });
-    }
-
-    for (let index = 0; index < missing.length; index += 3) {
-      await Promise.all(missing.slice(index, index + 3).map(geocode));
-    }
   }
 
   function loadBundledPlaces() {
@@ -529,24 +497,27 @@
   }
 
   function renderMarkers() {
-    if (!state.map || !window.AMap) return;
-    state.markers.forEach((marker) => state.map.remove(marker));
+    if (!state.map || !window.L) return;
+    state.markers.forEach((marker) => marker.remove());
     state.markers.clear();
 
     state.filtered.forEach((place, index) => {
       if (!validLngLat(place.lng, place.lat)) return;
-      const markerElement = document.createElement("div");
-      markerElement.className = `food-marker ${place.locationPrecision === "approximate" ? "is-approximate" : ""} ${state.selectedId === place.id ? "is-active" : ""}`;
-      markerElement.innerHTML = `<span>${index + 1}</span>`;
-      const marker = new AMap.Marker({
-        position: [place.lng, place.lat],
-        content: markerElement,
-        offset: new AMap.Pixel(-17, -39),
-        title: place.name,
-        zIndex: state.selectedId === place.id ? 120 : 100
+      const [mapLng, mapLat] = gcj02ToWgs84(place.lng, place.lat);
+      const markerHtml = `<div class="food-marker ${place.locationPrecision === "approximate" ? "is-approximate" : ""} ${state.selectedId === place.id ? "is-active" : ""}"><span>${index + 1}</span></div>`;
+      const icon = L.divIcon({
+        className: "food-marker-shell",
+        html: markerHtml,
+        iconSize: [34, 42],
+        iconAnchor: [17, 39],
+        popupAnchor: [0, -38]
       });
+      const marker = L.marker([mapLat, mapLng], {
+        icon,
+        title: place.name,
+        zIndexOffset: state.selectedId === place.id ? 120 : 100
+      }).addTo(state.map);
       marker.on("click", () => selectPlace(place.id, true));
-      state.map.add(marker);
       state.markers.set(place.id, marker);
     });
   }
@@ -554,8 +525,11 @@
   function fitMap() {
     if (!state.map) return;
     const markers = [...state.markers.values()];
-    if (markers.length > 1) state.map.setFitView(markers, false, [60, 60, 60, 60], 14);
-    else if (markers.length === 1) state.map.setZoomAndCenter(15, markers[0].getPosition());
+    if (markers.length > 1) {
+      state.map.fitBounds(L.featureGroup(markers).getBounds(), { padding: [60, 60], maxZoom: 14 });
+    } else if (markers.length === 1) {
+      state.map.setView(markers[0].getLatLng(), 15);
+    }
   }
 
   function selectPlace(id, openDrawer) {
@@ -565,12 +539,11 @@
     renderList();
     renderMarkers();
 
-    if (state.map && validLngLat(place.lng, place.lat)) {
-      state.map.panTo([place.lng, place.lat]);
-      state.map.setZoom(Math.max(state.map.getZoom(), 14));
+    const marker = state.markers.get(place.id);
+    if (state.map && marker) {
+      state.map.setView(marker.getLatLng(), Math.max(state.map.getZoom(), 14));
       const info = `<div class="map-info"><h4>${escapeHtml(place.name)}</h4><p>${escapeHtml(place.dish)}</p></div>`;
-      state.infoWindow.setContent(info);
-      state.infoWindow.open(state.map, [place.lng, place.lat]);
+      marker.bindPopup(info).openPopup();
     }
     if (openDrawer) showDrawer(place);
   }
@@ -639,21 +612,13 @@
   }
 
   function locateUser() {
-    if (!state.map || !window.AMap) {
+    if (!state.map) {
       showToast("地图还没有准备好");
       return;
     }
-    const geolocation = new AMap.Geolocation({
-      enableHighAccuracy: true,
-      timeout: 8000,
-      position: "LT",
-      offset: [18, 80],
-      zoomToAccuracy: true
-    });
-    state.map.addControl(geolocation);
-    geolocation.getCurrentPosition((status) => {
-      showToast(status === "complete" ? "已定位到你附近" : "暂时无法获取位置，请检查浏览器权限");
-    });
+    state.map.once("locationfound", () => showToast("已定位到你附近"));
+    state.map.once("locationerror", () => showToast("暂时无法获取位置，请检查浏览器权限"));
+    state.map.locate({ setView: true, maxZoom: 16, enableHighAccuracy: true, timeout: 8000 });
   }
 
   async function loadPlaces(showLoading) {
@@ -723,7 +688,6 @@
     elements.refreshButton.addEventListener("click", async () => {
       elements.refreshButton.querySelector("svg").style.animation = "spin .8s linear infinite";
       await loadPlaces(true);
-      await geocodeMissingPlaces();
       applyFilters();
       fitMap();
       elements.refreshButton.querySelector("svg").style.animation = "";
@@ -741,15 +705,14 @@
   async function start() {
     bindEvents();
     const sheetPromise = loadPlaces(false);
-    const mapPromise = loadAMap()
-      .then((AMap) => initMap(AMap))
+    const mapPromise = Promise.resolve()
+      .then(() => initMap())
       .catch((error) => {
         console.error(error);
         elements.mapFallback.hidden = false;
       });
 
     await Promise.allSettled([sheetPromise, mapPromise]);
-    await geocodeMissingPlaces();
     applyFilters();
     window.setTimeout(fitMap, 250);
   }

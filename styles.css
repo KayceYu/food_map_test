@@ -657,6 +657,11 @@ a:focus-visible {
   transition: 160ms ease;
 }
 
+.food-marker-shell {
+  border: 0 !important;
+  background: transparent !important;
+}
+
 .food-marker span {
   transform: rotate(45deg);
 }
@@ -671,14 +676,13 @@ a:focus-visible {
   transform: rotate(-45deg) scale(1.22);
 }
 
-.amap-info-contentContainer {
-  filter: drop-shadow(0 12px 20px rgba(38, 32, 22, 0.18));
+.leaflet-popup-content-wrapper {
+  border-radius: 14px;
+  box-shadow: 0 12px 20px rgba(38, 32, 22, 0.18);
 }
 
-.amap-info-content {
-  padding: 14px 16px !important;
-  border: 0 !important;
-  border-radius: 14px !important;
+.leaflet-popup-content {
+  margin: 14px 16px;
 }
 
 .map-info h4 {
