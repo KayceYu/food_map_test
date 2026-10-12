@@ -36,6 +36,11 @@
           <button class="icon-button" id="refreshButton" type="button" aria-label="刷新清单" title="刷新清单">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8.1 8.1 0 0 0-15.5-2M4 4v5h5M4 13a8.1 8.1 0 0 0 15.5 2M20 20v-5h-5" /></svg>
           </button>
+          <button class="text-button favorite-button" id="favoriteButton" type="button" aria-pressed="false" title="查看我的喜欢">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.6a5.5 5.5 0 0 0 1-8.8Z" /></svg>
+            <span class="favorite-label">我的喜欢</span>
+            <b class="favorite-count" id="favoriteCount" aria-label="0 家喜欢的店铺">0</b>
+          </button>
           <button class="text-button" id="locateButton" type="button">
             <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3" /><path d="M12 2v3M12 19v3M2 12h3M19 12h3" /></svg>
             找到我
@@ -71,7 +76,7 @@
             <div class="panel-heading">
               <div>
                 <p class="panel-kicker">TASTING NOTES</p>
-                <h2>值得专程去吃</h2>
+                <h2 id="placePanelTitle">值得专程去吃</h2>
               </div>
               <div class="panel-heading-actions">
                 <span id="resultCount">0 家</span>

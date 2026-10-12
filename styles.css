@@ -199,6 +199,43 @@ a:focus-visible {
   width: 17px;
 }
 
+.favorite-button {
+  position: relative;
+}
+
+.favorite-button svg {
+  transition: 160ms ease;
+}
+
+.favorite-count {
+  display: inline-grid;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  place-items: center;
+  color: var(--accent-dark);
+  background: #f6dfd3;
+  border-radius: 999px;
+  font-size: 10px;
+  line-height: 1;
+}
+
+.favorite-button.is-active {
+  color: #fffaf4;
+  border-color: var(--accent);
+  background: var(--accent);
+  box-shadow: 0 7px 16px rgba(232, 79, 39, 0.22);
+}
+
+.favorite-button.is-active svg {
+  fill: currentColor;
+}
+
+.favorite-button.is-active .favorite-count {
+  color: var(--accent-dark);
+  background: #fff3ea;
+}
+
 .icon-button {
   width: 42px;
   padding: 0;
@@ -1299,6 +1336,17 @@ body.is-detail-open .map-panel {
   .text-button {
     width: 42px;
     padding: 0;
+  }
+
+  .favorite-button .favorite-count {
+    position: absolute;
+    top: -4px;
+    right: -4px;
+    min-width: 17px;
+    height: 17px;
+    padding: 0 4px;
+    border: 2px solid var(--paper);
+    font-size: 9px;
   }
 
   .brand small {

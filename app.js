@@ -146,6 +146,7 @@
     tileLayer: null,
     markers: new Map(),
     selectedId: null,
+    onlyFavorites: false,
     favorites: loadFavorites(),
     toastTimer: null
   };
@@ -161,6 +162,8 @@
     sourcePill: document.getElementById("sourcePill"),
     sourceLabel: document.getElementById("sourceLabel"),
     refreshButton: document.getElementById("refreshButton"),
+    favoriteButton: document.getElementById("favoriteButton"),
+    favoriteCount: document.getElementById("favoriteCount"),
     locateButton: document.getElementById("locateButton"),
     fitMapButton: document.getElementById("fitMapButton"),
     mapPanel: document.querySelector(".map-panel"),
@@ -174,6 +177,7 @@
     newCategoryField: document.getElementById("newCategoryField"),
     newCategoryInput: document.getElementById("newCategoryInput"),
     publicSyncInput: document.getElementById("publicSyncInput"),
+    placePanelTitle: document.getElementById("placePanelTitle"),
     drawer: document.getElementById("detailDrawer"),
     drawerContent: document.getElementById("drawerContent"),
     drawerClose: document.getElementById("drawerClose"),
@@ -597,8 +601,9 @@
     const query = state.query.toLowerCase().trim();
     state.filtered = state.places.filter((place) => {
       const matchesCategory = state.category === "全部" || place.category === state.category;
+      const matchesFavorite = !state.onlyFavorites || state.favorites.has(place.id);
       const searchable = [place.name, place.category, place.address, place.city, place.dish, place.note].join(" ").toLowerCase();
-      return matchesCategory && (!query || searchable.includes(query));
+      return matchesCategory && matchesFavorite && (!query || searchable.includes(query));
     });
     renderList();
     renderMarkers();
@@ -607,11 +612,12 @@
   function renderList() {
     elements.resultCount.textContent = `${state.filtered.length} 家`;
     if (!state.filtered.length) {
+      const favoritesEmpty = state.onlyFavorites;
       elements.placeList.innerHTML = `
         <div class="empty-state">
-          <span>🥢</span>
-          <strong>没有找到这一口</strong>
-          <p>换个关键词或风味试试看。</p>
+          <span>${favoritesEmpty ? "♡" : "🥢"}</span>
+          <strong>${favoritesEmpty ? "还没有喜欢的店铺" : "没有找到这一口"}</strong>
+          <p>${favoritesEmpty ? "在店铺卡片上点一下爱心，就会收进这里。" : "换个关键词或风味试试看。"}</p>
         </div>`;
       return;
     }
@@ -744,9 +750,38 @@
       showToast("已收进口袋清单");
     }
     saveFavorites();
-    renderList();
+    updateFavoriteButton();
+    applyFilters();
     const place = state.places.find((item) => item.id === id);
     if (place && elements.drawer.classList.contains("is-open")) showDrawer(place);
+  }
+
+  function updateFavoriteButton() {
+    const availableCount = state.places.filter((place) => state.favorites.has(place.id)).length;
+    elements.favoriteCount.textContent = availableCount;
+    elements.favoriteCount.setAttribute("aria-label", `${availableCount} 家喜欢的店铺`);
+    elements.favoriteButton.classList.toggle("is-active", state.onlyFavorites);
+    elements.favoriteButton.setAttribute("aria-pressed", String(state.onlyFavorites));
+    elements.favoriteButton.title = state.onlyFavorites ? "返回全部店铺" : "查看我的喜欢";
+    elements.placePanelTitle.textContent = state.onlyFavorites ? "我的喜欢" : "值得专程去吃";
+  }
+
+  function toggleFavoritesView() {
+    state.onlyFavorites = !state.onlyFavorites;
+    if (state.onlyFavorites) {
+      state.category = "全部";
+      state.query = "";
+      elements.searchInput.value = "";
+      closeDrawer();
+    }
+    updateFavoriteButton();
+    renderFilters();
+    applyFilters();
+    const favoriteCount = state.places.filter((place) => state.favorites.has(place.id)).length;
+    showToast(state.onlyFavorites
+      ? (favoriteCount ? `正在查看 ${favoriteCount} 家喜欢的店铺` : "还没有喜欢的店铺")
+      : "已显示全部店铺");
+    document.querySelector(".places-panel")?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
   function showToast(message) {
@@ -841,9 +876,11 @@
     state.places.push(place);
     state.category = "全部";
     state.query = "";
+    state.onlyFavorites = false;
     state.selectedId = place.id;
     elements.searchInput.value = "";
     updateStats();
+    updateFavoriteButton();
     renderFilters();
     applyFilters();
     closeAddPlaceDialog();
@@ -908,6 +945,7 @@
       setSourceStatus("live", additions.length ? `${sourceText} · ${additions.join(" · ")}` : sourceText);
     }
     updateStats();
+    updateFavoriteButton();
     renderFilters();
     applyFilters();
   }
@@ -938,6 +976,7 @@
     });
 
     elements.addPlaceButton.addEventListener("click", openAddPlaceDialog);
+    elements.favoriteButton.addEventListener("click", toggleFavoritesView);
     elements.addPlaceClose.addEventListener("click", closeAddPlaceDialog);
     elements.addPlaceCancel.addEventListener("click", closeAddPlaceDialog);
     elements.placeCategorySelect.addEventListener("change", () => updateNewCategoryField(true));
