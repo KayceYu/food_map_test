@@ -385,6 +385,7 @@ a:focus-visible {
 .places-panel {
   display: flex;
   min-width: 0;
+  min-height: 0;
   flex-direction: column;
   border-right: 1px solid var(--line);
 }
@@ -415,7 +416,9 @@ a:focus-visible {
 
 .place-list {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 12px 13px 22px;
   scrollbar-color: #d8cfc0 transparent;
   scrollbar-width: thin;
@@ -955,19 +958,17 @@ a:focus-visible {
   }
 
   .place-list {
-    display: grid;
-    grid-auto-columns: minmax(310px, 78vw);
-    grid-auto-flow: column;
-    gap: 8px;
-    overflow-x: auto;
-    overflow-y: hidden;
+    display: block;
+    max-height: min(520px, 62vh);
+    overflow-x: hidden;
+    overflow-y: auto;
     padding-bottom: 16px;
   }
 
   .place-card + .place-card {
-    border-top-color: transparent;
-    border-left: 1px solid var(--line);
-    border-radius: 16px;
+    border-top-color: var(--line);
+    border-left: 0;
+    border-radius: 0 0 16px 16px;
   }
 
   .map-panel {
@@ -1026,7 +1027,7 @@ a:focus-visible {
   }
 
   .place-list {
-    grid-auto-columns: 88vw;
+    max-height: min(460px, 58vh);
   }
 
   .map-panel {

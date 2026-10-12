@@ -141,6 +141,7 @@
     category: "全部",
     query: "",
     map: null,
+    tileLayer: null,
     markers: new Map(),
     selectedId: null,
     favorites: loadFavorites(),
@@ -386,10 +387,53 @@
       [centerLat, centerLng],
       Number(config.defaultZoom) || 12
     );
-    L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      maxZoom: 19,
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>'
-    }).addTo(state.map);
+    const tileProviders = [
+      {
+        url: "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>'
+      },
+      {
+        url: "https://basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'
+      }
+    ];
+    let tileLoadTimer = null;
+
+    function useTileProvider(index) {
+      const provider = tileProviders[index];
+      if (!provider) {
+        showToast("地图底图暂时不可用，店铺标记仍可查看");
+        return;
+      }
+      if (state.tileLayer) state.tileLayer.remove();
+      let loaded = false;
+      let errors = 0;
+      const layer = L.tileLayer(provider.url, {
+        maxZoom: 19,
+        attribution: provider.attribution
+      });
+      state.tileLayer = layer;
+      layer.on("tileload", () => {
+        if (state.tileLayer !== layer) return;
+        loaded = true;
+        errors = 0;
+        window.clearTimeout(tileLoadTimer);
+      });
+      layer.on("tileerror", () => {
+        if (state.tileLayer !== layer) return;
+        errors += 1;
+        if (!loaded && errors >= 3) {
+          window.clearTimeout(tileLoadTimer);
+          useTileProvider(index + 1);
+        }
+      });
+      layer.addTo(state.map);
+      tileLoadTimer = window.setTimeout(() => {
+        if (!loaded && state.tileLayer === layer) useTileProvider(index + 1);
+      }, 6000);
+    }
+
+    useTileProvider(0);
     L.control.zoom({ position: "topright" }).addTo(state.map);
     L.control.scale({ imperial: false }).addTo(state.map);
     elements.mapFallback.hidden = true;

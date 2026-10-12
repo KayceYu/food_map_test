@@ -60,7 +60,7 @@ Google Sheet 配置位于 `config.js`，可作为后续同步来源。若要直�
 
 ## 地图与坐标
 
-地图底图来自 OpenStreetMap，通过 Leaflet 渲染，不需要高德 Key。原始门店坐标为高德 GCJ-02 坐标，应用在显示到 OpenStreetMap 前会转换为 WGS-84；“去高德导航”仍使用原始坐标，不需要调用高德 Web JS API。
+地图底图来自 OpenStreetMap，通过仓库内置的 Leaflet 静态资源渲染，不依赖第三方脚本 CDN，也不需要高德 Key。OpenStreetMap 瓦片不可用时会自动切换到 CARTO 备用底图。原始门店坐标为高德 GCJ-02 坐标，应用在显示到 OpenStreetMap 前会转换为 WGS-84；“去高德导航”仍使用原始坐标，不需要调用高德 Web JS API。
 
 公开配置位于 `config.js`：
 

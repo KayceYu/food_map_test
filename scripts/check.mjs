@@ -4,7 +4,18 @@ import { fileURLToPath } from "node:url";
 import vm from "node:vm";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const required = ["index.html", "styles.css", "app.js", "config.js", "server.js", "data/places.js", "data/coordinates.js"];
+const required = [
+  "index.html",
+  "styles.css",
+  "app.js",
+  "config.js",
+  "server.js",
+  "data/places.js",
+  "data/coordinates.js",
+  "vendor/leaflet.css",
+  "vendor/leaflet.js",
+  "vendor/LEAFLET-LICENSE.txt"
+];
 const contents = Object.fromEntries(
   await Promise.all(required.map(async (file) => [file, await readFile(resolve(root, file), "utf8")]))
 );
@@ -28,7 +39,8 @@ const checks = [
   ["public config contains no AMap credentials", !/amapKey|amapSecurityCode/.test(contents["config.js"])],
   ["Google Sheet is configured", /sheetId:\s*"[^"]{20,}"/.test(contents["config.js"])],
   ["Google Visualization loader is present", contents["app.js"].includes("/gviz/tq")],
-  ["Leaflet loader is present", contents["index.html"].includes("leaflet@1.9.4/dist/leaflet.js")],
+  ["local Leaflet assets are loaded", contents["index.html"].includes("./vendor/leaflet.js") && contents["index.html"].includes("./vendor/leaflet.css")],
+  ["runtime has no unpkg dependency", !contents["index.html"].includes("unpkg.com")],
   ["OpenStreetMap tile layer is present", contents["app.js"].includes("tile.openstreetmap.org")],
   ["application contains no AMap API loader", !contents["app.js"].includes("webapi.amap.com/maps")],
   ["bundled CSV dataset contains 45 places", Array.isArray(bundledPlaces) && bundledPlaces.length === 45],
