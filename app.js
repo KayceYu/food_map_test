@@ -161,6 +161,7 @@
     refreshButton: document.getElementById("refreshButton"),
     locateButton: document.getElementById("locateButton"),
     fitMapButton: document.getElementById("fitMapButton"),
+    mapPanel: document.querySelector(".map-panel"),
     mapFallback: document.getElementById("mapFallback"),
     drawer: document.getElementById("detailDrawer"),
     drawerContent: document.getElementById("drawerContent"),
@@ -624,14 +625,19 @@
     elements.scrim.hidden = false;
     elements.drawer.classList.add("is-open");
     elements.drawer.setAttribute("aria-hidden", "false");
+    elements.mapPanel.setAttribute("aria-hidden", "true");
+    document.body.classList.add("is-detail-open");
     document.body.style.overflow = "hidden";
   }
 
   function closeDrawer() {
     elements.drawer.classList.remove("is-open");
     elements.drawer.setAttribute("aria-hidden", "true");
+    elements.mapPanel.removeAttribute("aria-hidden");
+    document.body.classList.remove("is-detail-open");
     elements.scrim.hidden = true;
     document.body.style.overflow = "";
+    window.setTimeout(() => state.map?.invalidateSize(), 240);
   }
 
   function toggleFavorite(id) {
