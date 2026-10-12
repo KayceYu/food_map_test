@@ -12,6 +12,7 @@ const required = [
   "server.js",
   "data/places.js",
   "data/coordinates.js",
+  "data/community-places.js",
   "vendor/leaflet.css",
   "vendor/leaflet.js",
   "vendor/LEAFLET-LICENSE.txt"
@@ -23,8 +24,10 @@ const contents = Object.fromEntries(
 const dataSandbox = { window: {} };
 vm.runInNewContext(contents["data/places.js"], dataSandbox);
 vm.runInNewContext(contents["data/coordinates.js"], dataSandbox);
+vm.runInNewContext(contents["data/community-places.js"], dataSandbox);
 const bundledPlaces = dataSandbox.window.DELICIOUS_FOOD_MAP_DATA;
 const bundledCoordinates = dataSandbox.window.DELICIOUS_FOOD_MAP_COORDINATES;
+const communityPlaces = dataSandbox.window.DELICIOUS_FOOD_MAP_COMMUNITY;
 const validCoordinates = bundledCoordinates?.every((place) => (
   Number.isFinite(place.lng) && Number.isFinite(place.lat)
   && place.lng >= 113.7 && place.lng <= 114.7
@@ -35,6 +38,7 @@ const checks = [
   ["index references the stylesheet", contents["index.html"].includes("./styles.css")],
   ["index references the application", contents["index.html"].includes("./app.js")],
   ["index references bundled coordinates", contents["index.html"].includes("./data/coordinates.js")],
+  ["index references community places", contents["index.html"].includes("./data/community-places.js")],
   ["index loads config before the application", contents["index.html"].indexOf("./config.js") < contents["index.html"].indexOf("./app.js")],
   ["public config contains no AMap credentials", !/amapKey|amapSecurityCode/.test(contents["config.js"])],
   ["Google Sheet is configured", /sheetId:\s*"[^"]{20,}"/.test(contents["config.js"])],
@@ -47,6 +51,7 @@ const checks = [
   ["bundled places have names and addresses", bundledPlaces.every((place) => place.name && place.address)],
   ["all 45 places have validated map coordinates", Array.isArray(bundledCoordinates) && bundledCoordinates.length === 45 && validCoordinates],
   ["coordinate names match place names", bundledPlaces.every((place, index) => place.name === bundledCoordinates[index]?.name)],
+  ["community dataset is a valid array", Array.isArray(communityPlaces)],
   ["bundled dataset contains no mobile phone numbers", !/1[3-9]\d{9}/.test(contents["data/places.js"])]
 ];
 

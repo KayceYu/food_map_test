@@ -2,6 +2,8 @@
   "use strict";
 
   const config = window.DELICIOUS_FOOD_MAP_CONFIG || {};
+  const USER_PLACES_KEY = "dfm-user-places";
+  const NEW_CATEGORY_VALUE = "__new__";
 
   const fallbackPlaces = [
     {
@@ -163,6 +165,15 @@
     fitMapButton: document.getElementById("fitMapButton"),
     mapPanel: document.querySelector(".map-panel"),
     mapFallback: document.getElementById("mapFallback"),
+    addPlaceButton: document.getElementById("addPlaceButton"),
+    addPlaceDialog: document.getElementById("addPlaceDialog"),
+    addPlaceForm: document.getElementById("addPlaceForm"),
+    addPlaceClose: document.getElementById("addPlaceClose"),
+    addPlaceCancel: document.getElementById("addPlaceCancel"),
+    placeCategorySelect: document.getElementById("placeCategorySelect"),
+    newCategoryField: document.getElementById("newCategoryField"),
+    newCategoryInput: document.getElementById("newCategoryInput"),
+    publicSyncInput: document.getElementById("publicSyncInput"),
     drawer: document.getElementById("detailDrawer"),
     drawerContent: document.getElementById("drawerContent"),
     drawerClose: document.getElementById("drawerClose"),
@@ -312,6 +323,89 @@
 
   function saveFavorites() {
     localStorage.setItem("dfm-favorites", JSON.stringify([...state.favorites]));
+  }
+
+  function normalizeSavedPlace(row, index, source) {
+    if (!row || typeof row !== "object") return null;
+    const name = String(row.name || "").trim();
+    const category = String(row.category || "").trim();
+    const address = String(row.address || "").trim();
+    if (!name || !category || !address) return null;
+
+    const derivedCity = deriveCity(address);
+    const price = parseNumber(row.price);
+    return {
+      id: String(row.id || `${source}-${index}-${slug(name)}`).slice(0, 120),
+      name,
+      category,
+      address,
+      city: String(row.city || (derivedCity === "未标注" ? "深圳" : derivedCity)).trim(),
+      lng: null,
+      lat: null,
+      locationPrecision: "unresolved",
+      rating: null,
+      price: price && price > 0 ? price : null,
+      dish: String(row.dish || "").trim(),
+      note: String(row.note || "").trim(),
+      link: "",
+      emoji: emojiFor(category),
+      createdAt: String(row.createdAt || ""),
+      isUserAdded: source === "user",
+      isCommunityAdded: source === "community",
+      raw: row
+    };
+  }
+
+  function loadUserPlaces() {
+    try {
+      const rows = JSON.parse(localStorage.getItem(USER_PLACES_KEY) || "[]");
+      if (!Array.isArray(rows)) return [];
+      return rows.map((row, index) => normalizeSavedPlace(row, index, "user")).filter(Boolean);
+    } catch (error) {
+      console.warn("Could not read locally added places:", error);
+      return [];
+    }
+  }
+
+  function loadCommunityPlaces() {
+    const rows = window.DELICIOUS_FOOD_MAP_COMMUNITY;
+    if (!Array.isArray(rows)) return [];
+    return rows.map((row, index) => normalizeSavedPlace(row, index, "community")).filter(Boolean);
+  }
+
+  function serializeAddedPlace(place) {
+    return {
+      id: place.id,
+      name: place.name,
+      category: place.category,
+      address: place.address,
+      city: place.city,
+      price: place.price,
+      dish: place.dish,
+      note: place.note,
+      createdAt: place.createdAt
+    };
+  }
+
+  function saveUserPlaces(places) {
+    try {
+      localStorage.setItem(USER_PLACES_KEY, JSON.stringify(places.map(serializeAddedPlace)));
+      return true;
+    } catch (error) {
+      console.warn("Could not save locally added places:", error);
+      return false;
+    }
+  }
+
+  function buildPublicSubmissionUrl(place) {
+    const repository = String(config.publicRepo || "KayceYu/food_map_test").replace(/^https?:\/\/github\.com\//, "").replace(/^\/+|\/+$/g, "");
+    const payload = JSON.stringify({ schemaVersion: 1, ...serializeAddedPlace(place) }, null, 2);
+    const params = new URLSearchParams({
+      filename: `data/community-submissions/${place.id}.json`,
+      value: payload,
+      message: `Add community place: ${place.name}`
+    });
+    return `https://github.com/${repository}/new/main?${params}`;
   }
 
   function tableToRows(table) {
@@ -532,7 +626,7 @@
               <span class="place-meta">${escapeHtml(place.city)} · ${escapeHtml(place.category)}</span>
               <h3>${escapeHtml(place.name)}</h3>
               <span class="place-address">⌖ ${escapeHtml(place.address)}</span>
-              <span class="place-dish">↳ ${escapeHtml(place.dish)}</span>
+              <span class="place-dish">↳ ${escapeHtml(place.dish || "推荐菜待补充")}</span>
             </span>
             ${place.rating ? `<span class="place-card-rating">★ ${place.rating.toFixed(1)}</span>` : ""}
             <span class="favorite-mini ${saved ? "is-saved" : ""}" aria-label="${saved ? "取消收藏" : "收藏"}" data-favorite-id="${escapeHtml(place.id)}">${saved ? "♥" : "♡"}</span>
@@ -610,12 +704,13 @@
         <div class="drawer-stat"><span>人均消费</span><strong>${place.price ? `约 ¥${Math.round(place.price)}` : "清单未标注"}</strong></div>
         <div class="drawer-stat"><span>推荐风味</span><strong>${escapeHtml(place.category)}</strong></div>
       </div>
-      <div class="drawer-section"><span>必点这一口</span><p>${escapeHtml(place.dish)}</p></div>
-      <div class="drawer-section"><span>为什么值得去</span><p>${escapeHtml(place.note)}</p></div>
+      <div class="drawer-section"><span>必点这一口</span><p>${escapeHtml(place.dish || "暂未填写推荐菜品")}</p></div>
+      <div class="drawer-section"><span>为什么值得去</span><p>${escapeHtml(place.note || "暂未填写评价")}</p></div>
       <div class="drawer-section">
         <span>地址</span>
         <p>${escapeHtml(place.address)}</p>
         ${place.locationPrecision === "approximate" ? '<small class="location-precision">地图标记为附近参考位置，请以店铺地址为准。</small>' : ""}
+        ${place.locationPrecision === "unresolved" ? '<small class="location-precision">新增店铺暂未生成地图标记，可通过地址搜索导航。</small>' : ""}
       </div>
       <div class="drawer-actions">
         <button type="button" class="${saved ? "is-saved" : ""}" data-drawer-favorite="${escapeHtml(place.id)}">${saved ? "♥ 已收藏" : "♡ 收进口袋"}</button>
@@ -671,19 +766,117 @@
     state.map.locate({ setView: true, maxZoom: 16, enableHighAccuracy: true, timeout: 8000 });
   }
 
+  function renderAddPlaceCategories() {
+    const categories = [...new Set(state.places.map((place) => place.category).filter(Boolean))]
+      .sort((a, b) => a.localeCompare(b, "zh-CN"));
+    elements.placeCategorySelect.innerHTML = [
+      '<option value="" disabled selected>请选择已有种类</option>',
+      ...categories.map((category) => `<option value="${escapeHtml(category)}">${escapeHtml(category)}</option>`),
+      `<option value="${NEW_CATEGORY_VALUE}">＋ 新增种类</option>`
+    ].join("");
+  }
+
+  function updateNewCategoryField(focusInput) {
+    const isNew = elements.placeCategorySelect.value === NEW_CATEGORY_VALUE;
+    elements.newCategoryField.hidden = !isNew;
+    elements.newCategoryInput.required = isNew;
+    if (!isNew) elements.newCategoryInput.value = "";
+    if (isNew && focusInput) elements.newCategoryInput.focus();
+  }
+
+  function openAddPlaceDialog() {
+    elements.addPlaceForm.reset();
+    renderAddPlaceCategories();
+    updateNewCategoryField(false);
+    elements.addPlaceDialog.showModal();
+    window.setTimeout(() => document.getElementById("placeNameInput")?.focus(), 0);
+  }
+
+  function closeAddPlaceDialog() {
+    if (elements.addPlaceDialog.open) elements.addPlaceDialog.close();
+  }
+
+  function openPublicSubmission(place) {
+    const link = document.createElement("a");
+    link.href = buildPublicSubmissionUrl(place);
+    link.target = "_blank";
+    link.rel = "noopener noreferrer";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  }
+
+  function handleAddPlaceSubmit(event) {
+    event.preventDefault();
+    if (!elements.addPlaceForm.reportValidity()) return;
+
+    const formData = new FormData(elements.addPlaceForm);
+    const name = String(formData.get("name") || "").trim();
+    const selectedCategory = String(formData.get("category") || "").trim();
+    const category = selectedCategory === NEW_CATEGORY_VALUE
+      ? String(formData.get("newCategory") || "").trim()
+      : selectedCategory;
+    const address = String(formData.get("address") || "").trim();
+    if (!name || !category || !address) return;
+
+    const derivedCity = deriveCity(address);
+    const price = parseNumber(formData.get("price"));
+    const createdAt = new Date().toISOString();
+    const storedPlace = {
+      id: `user-${Date.now()}-${slug(name) || "place"}`,
+      name,
+      category,
+      address,
+      city: derivedCity === "未标注" ? "深圳" : derivedCity,
+      price: price && price > 0 ? price : null,
+      dish: String(formData.get("dish") || "").trim(),
+      note: String(formData.get("note") || "").trim(),
+      createdAt
+    };
+    const place = normalizeSavedPlace(storedPlace, 0, "user");
+    const userPlaces = loadUserPlaces();
+    userPlaces.push(place);
+    const saved = saveUserPlaces(userPlaces);
+
+    state.places.push(place);
+    state.category = "全部";
+    state.query = "";
+    state.selectedId = place.id;
+    elements.searchInput.value = "";
+    updateStats();
+    renderFilters();
+    applyFilters();
+    closeAddPlaceDialog();
+
+    window.requestAnimationFrame(() => {
+      const card = [...elements.placeList.querySelectorAll("[data-place-id]")]
+        .find((item) => item.dataset.placeId === place.id);
+      card?.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+
+    const shouldSync = formData.get("publicSync") === "on";
+    if (shouldSync) {
+      openPublicSubmission(place);
+      showToast(saved ? "已添加，请在 GitHub 新页面确认公开同步" : "已加入本次清单，请在 GitHub 确认公开同步");
+    } else {
+      showToast(saved ? "店铺已添加并保存在此浏览器" : "店铺已加入本次清单");
+    }
+  }
+
   async function loadPlaces(showLoading) {
     if (showLoading) {
       elements.placeList.innerHTML = `<div class="list-loading"><span class="loader"></span><p>正在翻阅大家的美食清单…</p></div>`;
       setSourceStatus("", "正在读取清单");
     }
     const bundledPlaces = loadBundledPlaces();
+    let sourceText = "";
     if (bundledPlaces) {
       state.places = bundledPlaces;
-      setSourceStatus("live", `宝安 CSV · ${bundledPlaces.length} 家`);
+      sourceText = `宝安 CSV · ${bundledPlaces.length} 家`;
     } else {
       try {
         state.places = await loadGoogleSheet();
-        setSourceStatus("live", "Google Sheet 已同步");
+        sourceText = "Google Sheet 已同步";
       } catch (error) {
         console.warn("Using bundled demo data:", error);
         state.places = fallbackPlaces.map((place, index) => ({
@@ -695,6 +888,24 @@
         setSourceStatus("fallback", "演示数据 · 表格暂不可用");
         showToast("共享表格暂不可用，已载入演示地点");
       }
+    }
+    const communityPlaces = loadCommunityPlaces();
+    const userPlaces = loadUserPlaces();
+    const seenIds = new Set(state.places.map((place) => place.id));
+    [...communityPlaces, ...userPlaces].forEach((place) => {
+      if (!seenIds.has(place.id)) {
+        state.places.push(place);
+        seenIds.add(place.id);
+      }
+    });
+    if (sourceText) {
+      const additions = [
+        communityPlaces.length ? `公开新增 ${communityPlaces.length}` : "",
+        userPlaces.filter((place) => !communityPlaces.some((publicPlace) => publicPlace.id === place.id)).length
+          ? `本地新增 ${userPlaces.filter((place) => !communityPlaces.some((publicPlace) => publicPlace.id === place.id)).length}`
+          : ""
+      ].filter(Boolean);
+      setSourceStatus("live", additions.length ? `${sourceText} · ${additions.join(" · ")}` : sourceText);
     }
     updateStats();
     renderFilters();
@@ -724,6 +935,15 @@
       }
       const card = event.target.closest("[data-place-id]");
       if (card) selectPlace(card.dataset.placeId, true);
+    });
+
+    elements.addPlaceButton.addEventListener("click", openAddPlaceDialog);
+    elements.addPlaceClose.addEventListener("click", closeAddPlaceDialog);
+    elements.addPlaceCancel.addEventListener("click", closeAddPlaceDialog);
+    elements.placeCategorySelect.addEventListener("change", () => updateNewCategoryField(true));
+    elements.addPlaceForm.addEventListener("submit", handleAddPlaceSubmit);
+    elements.addPlaceDialog.addEventListener("click", (event) => {
+      if (event.target === elements.addPlaceDialog) closeAddPlaceDialog();
     });
 
     elements.drawerContent.addEventListener("click", (event) => {

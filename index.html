@@ -73,7 +73,13 @@
                 <p class="panel-kicker">TASTING NOTES</p>
                 <h2>值得专程去吃</h2>
               </div>
-              <span id="resultCount">0 家</span>
+              <div class="panel-heading-actions">
+                <span id="resultCount">0 家</span>
+                <button class="add-place-button" id="addPlaceButton" type="button">
+                  <span aria-hidden="true">＋</span>
+                  添加店铺
+                </button>
+              </div>
             </div>
             <div class="place-list" id="placeList" aria-live="polite">
               <div class="list-loading">
@@ -99,6 +105,69 @@
       </main>
     </div>
 
+    <dialog class="add-place-dialog" id="addPlaceDialog" aria-labelledby="addPlaceTitle">
+      <form class="add-place-form" id="addPlaceForm">
+        <div class="form-header">
+          <div>
+            <p class="panel-kicker">ADD A PLACE</p>
+            <h2 id="addPlaceTitle">把好店放进地图</h2>
+            <p>店铺会先保存在当前浏览器中，也可以提交到公开清单与大家共享。</p>
+          </div>
+          <button class="dialog-close" id="addPlaceClose" type="button" aria-label="关闭添加店铺窗口">×</button>
+        </div>
+
+        <div class="form-grid">
+          <label class="form-field">
+            <span>店铺名称 <em>必填</em></span>
+            <input id="placeNameInput" name="name" type="text" maxlength="80" autocomplete="organization" placeholder="例如：街角牛肉店" required />
+          </label>
+
+          <label class="form-field">
+            <span>种类 <em>必填</em></span>
+            <select id="placeCategorySelect" name="category" required></select>
+          </label>
+
+          <label class="form-field form-field-wide" id="newCategoryField" hidden>
+            <span>新增种类 <em>必填</em></span>
+            <input id="newCategoryInput" name="newCategory" type="text" maxlength="30" placeholder="例如：轻食沙拉" />
+          </label>
+
+          <label class="form-field form-field-wide">
+            <span>地址 <em>必填</em></span>
+            <textarea id="placeAddressInput" name="address" rows="2" maxlength="180" autocomplete="street-address" placeholder="请输入完整地址，方便导航搜索" required></textarea>
+          </label>
+
+          <label class="form-field">
+            <span>人均消费 <small>选填</small></span>
+            <span class="input-prefix"><b>¥</b><input id="placePriceInput" name="price" type="number" min="0" max="99999" step="1" inputmode="numeric" placeholder="80" /></span>
+          </label>
+
+          <label class="form-field">
+            <span>推荐菜品 <small>选填</small></span>
+            <input id="placeDishInput" name="dish" type="text" maxlength="120" placeholder="用顿号分隔多个菜品" />
+          </label>
+
+          <label class="form-field form-field-wide">
+            <span>评价 <small>选填</small></span>
+            <textarea id="placeReviewInput" name="note" rows="3" maxlength="500" placeholder="写下值得推荐的理由、口味或用餐提示"></textarea>
+          </label>
+
+          <label class="sync-option form-field-wide">
+            <input id="publicSyncInput" name="publicSync" type="checkbox" checked />
+            <span>
+              <strong>同步到公开仓库</strong>
+              <small>添加后会打开 GitHub 文件提交页；确认提交后，店铺将进入公开地图。</small>
+            </span>
+          </label>
+        </div>
+
+        <div class="form-actions">
+          <button class="form-cancel" id="addPlaceCancel" type="button">取消</button>
+          <button class="form-submit" type="submit">添加到清单</button>
+        </div>
+      </form>
+    </dialog>
+
     <div class="scrim" id="scrim" hidden></div>
     <aside class="detail-drawer" id="detailDrawer" aria-hidden="true" aria-label="地点详情">
       <button class="drawer-close" id="drawerClose" type="button" aria-label="关闭详情">×</button>
@@ -110,6 +179,7 @@
     <script src="./config.js"></script>
     <script src="./data/places.js"></script>
     <script src="./data/coordinates.js"></script>
+    <script src="./data/community-places.js"></script>
     <script
       src="./vendor/leaflet.js"
     ></script>

@@ -1,0 +1,1 @@
+window.DELICIOUS_FOOD_MAP_COMMUNITY = [];
