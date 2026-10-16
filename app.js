@@ -147,6 +147,9 @@
     markers: new Map(),
     selectedId: null,
     onlyFavorites: false,
+    importMap: null,
+    importMarker: null,
+    importRequiresLocation: false,
     favorites: loadFavorites(),
     toastTimer: null
   };
@@ -169,6 +172,21 @@
     mapPanel: document.querySelector(".map-panel"),
     mapFallback: document.getElementById("mapFallback"),
     addPlaceButton: document.getElementById("addPlaceButton"),
+    importPlaceButton: document.getElementById("importPlaceButton"),
+    amapImportSection: document.getElementById("amapImportSection"),
+    amapShareInput: document.getElementById("amapShareInput"),
+    parseAmapButton: document.getElementById("parseAmapButton"),
+    amapImportStatus: document.getElementById("amapImportStatus"),
+    amapSourceLink: document.getElementById("amapSourceLink"),
+    importLocationSection: document.getElementById("importLocationSection"),
+    importCoordinateLabel: document.getElementById("importCoordinateLabel"),
+    amapCoordinateInput: document.getElementById("amapCoordinateInput"),
+    applyAmapCoordinateButton: document.getElementById("applyAmapCoordinateButton"),
+    importedLngInput: document.getElementById("importedLngInput"),
+    importedLatInput: document.getElementById("importedLatInput"),
+    importedSystemInput: document.getElementById("importedSystemInput"),
+    importedPrecisionInput: document.getElementById("importedPrecisionInput"),
+    importedAmapUrlInput: document.getElementById("importedAmapUrlInput"),
     addPlaceDialog: document.getElementById("addPlaceDialog"),
     addPlaceForm: document.getElementById("addPlaceForm"),
     addPlaceClose: document.getElementById("addPlaceClose"),
@@ -338,15 +356,20 @@
 
     const derivedCity = deriveCity(address);
     const price = parseNumber(row.price);
+    const lng = parseNumber(row.lng);
+    const lat = parseNumber(row.lat);
+    const hasPosition = validLngLat(lng, lat);
     return {
       id: String(row.id || `${source}-${index}-${slug(name)}`).slice(0, 120),
       name,
       category,
       address,
       city: String(row.city || (derivedCity === "未标注" ? "深圳" : derivedCity)).trim(),
-      lng: null,
-      lat: null,
-      locationPrecision: "unresolved",
+      lng: hasPosition ? lng : null,
+      lat: hasPosition ? lat : null,
+      coordinateSystem: row.coordinateSystem === "wgs84" ? "wgs84" : "gcj02",
+      locationPrecision: hasPosition ? (row.locationPrecision === "manual" ? "manual" : "exact") : "unresolved",
+      amapUrl: window.DFM_AMAP_IMPORT.safeAmapUrl(row.amapUrl),
       rating: null,
       price: price && price > 0 ? price : null,
       dish: String(row.dish || "").trim(),
@@ -384,6 +407,11 @@
       category: place.category,
       address: place.address,
       city: place.city,
+      lng: place.lng,
+      lat: place.lat,
+      coordinateSystem: place.coordinateSystem,
+      locationPrecision: place.locationPrecision,
+      amapUrl: place.amapUrl,
       price: place.price,
       dish: place.dish,
       note: place.note,
@@ -648,7 +676,9 @@
 
     state.filtered.forEach((place, index) => {
       if (!validLngLat(place.lng, place.lat)) return;
-      const [mapLng, mapLat] = gcj02ToWgs84(place.lng, place.lat);
+      const [mapLng, mapLat] = place.coordinateSystem === "wgs84"
+        ? [place.lng, place.lat]
+        : gcj02ToWgs84(place.lng, place.lat);
       const markerHtml = `<div class="food-marker ${place.locationPrecision === "approximate" ? "is-approximate" : ""} ${state.selectedId === place.id ? "is-active" : ""}"><span>${index + 1}</span></div>`;
       const icon = L.divIcon({
         className: "food-marker-shell",
@@ -696,7 +726,7 @@
   function showDrawer(place) {
     const saved = state.favorites.has(place.id);
     const destination = validLngLat(place.lng, place.lat)
-      ? `https://uri.amap.com/marker?position=${place.lng},${place.lat}&name=${encodeURIComponent(place.name)}&src=delicious-food-map&coordinate=gaode&callnative=0`
+      ? `https://uri.amap.com/marker?position=${place.lng},${place.lat}&name=${encodeURIComponent(place.name)}&src=delicious-food-map&coordinate=${place.coordinateSystem === "wgs84" ? "wgs84" : "gaode"}&callnative=0`
       : `https://www.amap.com/search?query=${encodeURIComponent(`${place.name} ${place.address}`)}`;
 
     elements.drawerContent.innerHTML = `
@@ -717,6 +747,7 @@
         <p>${escapeHtml(place.address)}</p>
         ${place.locationPrecision === "approximate" ? '<small class="location-precision">地图标记为附近参考位置，请以店铺地址为准。</small>' : ""}
         ${place.locationPrecision === "unresolved" ? '<small class="location-precision">新增店铺暂未生成地图标记，可通过地址搜索导航。</small>' : ""}
+        ${place.locationPrecision === "manual" ? '<small class="location-precision">此位置由导入时手动选点确认，请以店铺实际地址为准。</small>' : ""}
       </div>
       <div class="drawer-actions">
         <button type="button" class="${saved ? "is-saved" : ""}" data-drawer-favorite="${escapeHtml(place.id)}">${saved ? "♥ 已收藏" : "♡ 收进口袋"}</button>
@@ -819,12 +850,145 @@
     if (isNew && focusInput) elements.newCategoryInput.focus();
   }
 
-  function openAddPlaceDialog() {
+  function setImportStatus(message, isError = false) {
+    elements.amapImportStatus.textContent = message;
+    elements.amapImportStatus.classList.toggle("is-error", isError);
+  }
+
+  function showImportMap() {
+    elements.importLocationSection.hidden = false;
+    if (!window.L) {
+      setImportStatus("位置预览暂不可用，请粘贴高德坐标后导入。", true);
+      return;
+    }
+    if (!state.importMap) {
+      const center = config.defaultCenter || [113.884, 22.555];
+      const [lng, lat] = gcj02ToWgs84(Number(center[0]), Number(center[1]));
+      state.importMap = L.map("importMap", { scrollWheelZoom: false }).setView([lat, lng], 12);
+      const tiles = L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        maxZoom: 19,
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>'
+      }).addTo(state.importMap);
+      let tileErrors = 0;
+      tiles.on("tileerror", () => {
+        if (++tileErrors === 3) {
+          tiles.remove();
+          L.tileLayer("https://basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
+            maxZoom: 19,
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'
+          }).addTo(state.importMap);
+        }
+      });
+      state.importMap.on("click", (event) => {
+        setImportPosition(event.latlng.lng, event.latlng.lat, "wgs84", "manual");
+        setImportStatus("位置已确认。检查下方店名、种类和地址后即可导入。");
+      });
+    }
+    window.requestAnimationFrame(() => state.importMap?.invalidateSize());
+  }
+
+  function clearImportPosition() {
+    elements.importedLngInput.value = "";
+    elements.importedLatInput.value = "";
+    elements.importedSystemInput.value = "";
+    elements.importedPrecisionInput.value = "";
+    elements.amapCoordinateInput.value = "";
+    elements.importCoordinateLabel.textContent = "点击地图放置标记";
+    state.importMarker?.remove();
+    state.importMarker = null;
+  }
+
+  function setImportPosition(lng, lat, coordinateSystem = "gcj02", precision = "exact") {
+    if (!validLngLat(lng, lat)) return;
+    elements.importedLngInput.value = lng;
+    elements.importedLatInput.value = lat;
+    elements.importedSystemInput.value = coordinateSystem;
+    elements.importedPrecisionInput.value = precision;
+    elements.amapCoordinateInput.value = coordinateSystem === "gcj02" ? `${lng.toFixed(6)},${lat.toFixed(6)}` : "";
+    elements.importCoordinateLabel.textContent = `已确认 · ${lng.toFixed(6)}, ${lat.toFixed(6)}`;
+    showImportMap();
+    if (!state.importMap) return;
+    const [mapLng, mapLat] = coordinateSystem === "wgs84" ? [lng, lat] : gcj02ToWgs84(lng, lat);
+    if (!state.importMarker) {
+      const icon = L.divIcon({
+        className: "food-marker-shell",
+        html: '<div class="food-marker"><span>✓</span></div>',
+        iconSize: [34, 42],
+        iconAnchor: [17, 39]
+      });
+      state.importMarker = L.marker([mapLat, mapLng], { icon, draggable: true }).addTo(state.importMap);
+      state.importMarker.on("dragend", () => {
+        const position = state.importMarker.getLatLng();
+        setImportPosition(position.lng, position.lat, "wgs84", "manual");
+        setImportStatus("位置已校准，保存后会显示在主地图。");
+      });
+    } else {
+      state.importMarker.setLatLng([mapLat, mapLng]);
+    }
+    state.importMap.setView([mapLat, mapLng], Math.max(state.importMap.getZoom(), 16));
+  }
+
+  function parseAmapShare() {
+    try {
+      const place = window.DFM_AMAP_IMPORT.parseShare(elements.amapShareInput.value);
+      clearImportPosition();
+      state.importRequiresLocation = true;
+      elements.importedAmapUrlInput.value = place.amapUrl;
+      elements.amapSourceLink.href = place.amapUrl;
+      elements.amapSourceLink.hidden = false;
+      document.getElementById("placeNameInput").value = place.name;
+      document.getElementById("placeAddressInput").value = place.address;
+      document.getElementById("placePriceInput").value = place.price != null && place.price > 0 ? place.price : "";
+      elements.placeCategorySelect.value = "";
+      updateNewCategoryField(false);
+      if (place.category) {
+        const exists = [...elements.placeCategorySelect.options].some((option) => option.value === place.category);
+        elements.placeCategorySelect.value = exists ? place.category : NEW_CATEGORY_VALUE;
+        updateNewCategoryField(false);
+        if (!exists) elements.newCategoryInput.value = place.category;
+      }
+      if (validLngLat(place.lng, place.lat)) {
+        setImportPosition(place.lng, place.lat, place.coordinateSystem);
+        setImportStatus("已识别链接中的信息和坐标。补全店名、种类和地址后即可添加到地图。");
+      } else {
+        showImportMap();
+        setImportStatus("已识别分享信息。这个链接未包含坐标，请在预览地图点击店铺位置，或粘贴高德坐标后定位。");
+      }
+    } catch (error) {
+      setImportStatus(error.message, true);
+    }
+  }
+
+  function applyAmapCoordinate() {
+    const position = window.DFM_AMAP_IMPORT.parseCoordinatePair(elements.amapCoordinateInput.value);
+    if (!position) {
+      setImportStatus("请输入有效的高德坐标，格式为：经度,纬度。", true);
+      elements.amapCoordinateInput.focus();
+      return;
+    }
+    state.importRequiresLocation = true;
+    setImportPosition(position.lng, position.lat);
+    setImportStatus("坐标已确认，检查店铺信息后即可添加到地图。");
+  }
+
+  function openAddPlaceDialog(importMode = false) {
     elements.addPlaceForm.reset();
     renderAddPlaceCategories();
     updateNewCategoryField(false);
+    clearImportPosition();
+    state.importRequiresLocation = importMode;
+    elements.amapImportSection.open = importMode;
+    elements.importLocationSection.hidden = true;
+    elements.amapSourceLink.hidden = true;
+    elements.amapSourceLink.removeAttribute("href");
+    setImportStatus("含坐标链接可直接标记；短链接需在下方地图确认位置。");
     elements.addPlaceDialog.showModal();
-    window.setTimeout(() => document.getElementById("placeNameInput")?.focus(), 0);
+    if (state.importMap) {
+      const center = config.defaultCenter || [113.884, 22.555];
+      const [lng, lat] = gcj02ToWgs84(Number(center[0]), Number(center[1]));
+      state.importMap.setView([lat, lng], 12);
+    }
+    window.setTimeout(() => (importMode ? elements.amapShareInput : document.getElementById("placeNameInput"))?.focus(), 0);
   }
 
   function closeAddPlaceDialog() {
@@ -843,6 +1007,13 @@
 
   function handleAddPlaceSubmit(event) {
     event.preventDefault();
+    if (state.importRequiresLocation && !validLngLat(parseNumber(elements.importedLngInput.value), parseNumber(elements.importedLatInput.value))) {
+      elements.amapImportSection.open = true;
+      showImportMap();
+      setImportStatus("请先识别高德链接并确认地图位置，再添加店铺。", true);
+      elements.amapImportStatus.scrollIntoView({ block: "center", behavior: "smooth" });
+      return;
+    }
     if (!elements.addPlaceForm.reportValidity()) return;
 
     const formData = new FormData(elements.addPlaceForm);
@@ -863,6 +1034,11 @@
       category,
       address,
       city: derivedCity === "未标注" ? "深圳" : derivedCity,
+      lng: parseNumber(formData.get("lng")),
+      lat: parseNumber(formData.get("lat")),
+      coordinateSystem: String(formData.get("coordinateSystem") || "gcj02"),
+      locationPrecision: String(formData.get("locationPrecision") || "unresolved"),
+      amapUrl: window.DFM_AMAP_IMPORT.safeAmapUrl(formData.get("amapUrl")),
       price: price && price > 0 ? price : null,
       dish: String(formData.get("dish") || "").trim(),
       note: String(formData.get("note") || "").trim(),
@@ -884,6 +1060,10 @@
     renderFilters();
     applyFilters();
     closeAddPlaceDialog();
+    if (state.map && validLngLat(place.lng, place.lat)) {
+      const marker = state.markers.get(place.id);
+      if (marker) state.map.setView(marker.getLatLng(), 16);
+    }
 
     window.requestAnimationFrame(() => {
       const card = [...elements.placeList.querySelectorAll("[data-place-id]")]
@@ -896,7 +1076,7 @@
       openPublicSubmission(place);
       showToast(saved ? "已添加，请在 GitHub 新页面确认公开同步" : "已加入本次清单，请在 GitHub 确认公开同步");
     } else {
-      showToast(saved ? "店铺已添加并保存在此浏览器" : "店铺已加入本次清单");
+      showToast(saved ? (validLngLat(place.lng, place.lat) ? "店铺已导入并在地图标记" : "店铺已添加并保存在此浏览器") : "店铺已加入本次清单");
     }
   }
 
@@ -975,7 +1155,29 @@
       if (card) selectPlace(card.dataset.placeId, true);
     });
 
-    elements.addPlaceButton.addEventListener("click", openAddPlaceDialog);
+    elements.addPlaceButton.addEventListener("click", () => openAddPlaceDialog(false));
+    elements.importPlaceButton.addEventListener("click", () => openAddPlaceDialog(true));
+    elements.parseAmapButton.addEventListener("click", parseAmapShare);
+    elements.applyAmapCoordinateButton.addEventListener("click", applyAmapCoordinate);
+    elements.amapCoordinateInput.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") { event.preventDefault(); applyAmapCoordinate(); }
+    });
+    elements.amapShareInput.addEventListener("paste", () => {
+      window.setTimeout(parseAmapShare, 0);
+    });
+    elements.amapShareInput.addEventListener("input", () => {
+      clearImportPosition();
+      elements.importedAmapUrlInput.value = "";
+      elements.amapSourceLink.hidden = true;
+      elements.amapSourceLink.removeAttribute("href");
+      state.importRequiresLocation = true;
+      setImportStatus("分享内容已更改，请重新识别并确认位置。");
+    });
+    elements.amapImportSection.addEventListener("toggle", () => {
+      if (elements.amapImportSection.open && state.importMap) {
+        window.requestAnimationFrame(() => state.importMap.invalidateSize());
+      }
+    });
     elements.favoriteButton.addEventListener("click", toggleFavoritesView);
     elements.addPlaceClose.addEventListener("click", closeAddPlaceDialog);
     elements.addPlaceCancel.addEventListener("click", closeAddPlaceDialog);

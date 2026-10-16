@@ -8,6 +8,7 @@ const required = [
   "index.html",
   "styles.css",
   "app.js",
+  "amap-import.js",
   "config.js",
   "server.js",
   "data/places.js",
@@ -37,6 +38,7 @@ const validCoordinates = bundledCoordinates?.every((place) => (
 const checks = [
   ["index references the stylesheet", contents["index.html"].includes("./styles.css")],
   ["index references the application", contents["index.html"].includes("./app.js")],
+  ["AMap import parser loads before the application", contents["index.html"].includes("./amap-import.js") && contents["index.html"].indexOf("./amap-import.js") < contents["index.html"].indexOf("./app.js")],
   ["index references bundled coordinates", contents["index.html"].includes("./data/coordinates.js")],
   ["index references community places", contents["index.html"].includes("./data/community-places.js")],
   ["index loads config before the application", contents["index.html"].indexOf("./config.js") < contents["index.html"].indexOf("./app.js")],

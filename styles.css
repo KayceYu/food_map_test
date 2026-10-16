@@ -197,6 +197,9 @@ a:focus-visible {
 
 .text-button svg {
   width: 17px;
+  height: 17px;
+  flex: 0 0 17px;
+  display: block;
 }
 
 .favorite-button {
@@ -243,6 +246,9 @@ a:focus-visible {
 
 .icon-button svg {
   width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+  display: block;
 }
 
 .hero {
@@ -435,6 +441,8 @@ a:focus-visible {
 
 .panel-heading {
   display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
   align-items: flex-end;
   justify-content: space-between;
   padding: 26px 26px 20px;
@@ -454,7 +462,7 @@ a:focus-visible {
 
 .panel-heading-actions {
   display: flex;
-  gap: 12px;
+  gap: 8px;
   align-items: center;
 }
 
@@ -491,6 +499,22 @@ a:focus-visible {
   background: var(--accent);
   border-color: var(--accent);
   transform: translateY(-1px);
+}
+
+.import-place-button {
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid rgba(83, 100, 67, 0.3);
+  color: var(--olive);
+  background: #f0f3e9;
+  border-radius: 999px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.import-place-button:hover {
+  background: #e5ebd9;
 }
 
 .place-list {
@@ -916,6 +940,125 @@ body.is-detail-open .map-panel {
   font-size: 22px;
 }
 
+.amap-import {
+  margin-top: 20px;
+  border: 1px solid rgba(83, 100, 67, 0.25);
+  background: rgba(229, 235, 217, 0.3);
+  border-radius: 14px;
+}
+
+.amap-import summary {
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  padding: 14px;
+  color: var(--olive);
+  cursor: pointer;
+  list-style: none;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.amap-import summary::-webkit-details-marker {
+  display: none;
+}
+
+.amap-import[open] summary span {
+  transform: rotate(180deg);
+}
+
+.amap-import-content {
+  padding: 0 14px 15px;
+}
+
+.amap-import-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  margin-top: 10px;
+}
+
+.import-parse-button,
+.coordinate-entry button {
+  min-height: 38px;
+  padding: 0 13px;
+  border: 1px solid var(--olive);
+  color: #fff;
+  background: var(--olive);
+  border-radius: 10px;
+  cursor: pointer;
+  white-space: nowrap;
+  font-size: 12px;
+}
+
+.amap-import a {
+  color: var(--olive);
+  font-size: 12px;
+  text-underline-offset: 3px;
+}
+
+.import-status,
+.form-help {
+  margin: 10px 0 0;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.7;
+}
+
+.import-status.is-error {
+  color: var(--accent-dark);
+}
+
+.amap-source-link {
+  display: inline-block;
+  margin-top: 8px;
+}
+
+.amap-source-link[hidden],
+.import-location[hidden] {
+  display: none;
+}
+
+.import-location {
+  margin-top: 16px;
+}
+
+.import-location-heading {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  justify-content: space-between;
+  margin-bottom: 9px;
+  font-size: 12px;
+}
+
+.import-location-heading span {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.import-map {
+  height: 230px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  cursor: crosshair;
+}
+
+.import-coordinate-field {
+  margin-top: 14px;
+}
+
+.coordinate-entry {
+  display: flex;
+  gap: 8px;
+}
+
+.coordinate-entry input {
+  min-width: 0;
+}
+
 .form-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -1327,15 +1470,22 @@ body.is-detail-open .map-panel {
     height: 76px;
   }
 
-  .source-pill,
-  .text-button span,
-  .text-button {
-    font-size: 0;
+  .source-pill > span,
+  .text-button .button-label {
+    display: none;
+  }
+
+  .source-pill {
+    width: 42px;
+    padding: 0;
+    gap: 0;
   }
 
   .text-button {
     width: 42px;
+    height: 42px;
     padding: 0;
+    gap: 0;
   }
 
   .favorite-button .favorite-count {
@@ -1376,9 +1526,12 @@ body.is-detail-open .map-panel {
   }
 
   .panel-heading-actions {
-    align-items: flex-end;
-    flex-direction: column;
-    gap: 7px;
+    width: 100%;
+    justify-content: flex-end;
+  }
+
+  .panel-heading-actions > span {
+    margin-right: auto;
   }
 
   .add-place-button {
@@ -1438,5 +1591,11 @@ body.is-detail-open .map-panel {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+  }
+}
+
+@media (max-width: 380px) {
+  .topbar-actions .source-pill {
+    display: none;
   }
 }

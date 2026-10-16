@@ -8,6 +8,7 @@ const files = [
   "index.html",
   "styles.css",
   "app.js",
+  "amap-import.js",
   "config.js",
   "data/places.js",
   "data/coordinates.js",

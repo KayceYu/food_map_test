@@ -36,14 +36,14 @@
           <button class="icon-button" id="refreshButton" type="button" aria-label="刷新清单" title="刷新清单">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8.1 8.1 0 0 0-15.5-2M4 4v5h5M4 13a8.1 8.1 0 0 0 15.5 2M20 20v-5h-5" /></svg>
           </button>
-          <button class="text-button favorite-button" id="favoriteButton" type="button" aria-pressed="false" title="查看我的喜欢">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.6a5.5 5.5 0 0 0 1-8.8Z" /></svg>
-            <span class="favorite-label">我的喜欢</span>
+          <button class="text-button favorite-button" id="favoriteButton" type="button" aria-label="我的喜欢" aria-pressed="false" title="查看我的喜欢">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8L12 21l8.8-8.6a5.5 5.5 0 0 0 0-7.8Z" /></svg>
+            <span class="button-label">我的喜欢</span>
             <b class="favorite-count" id="favoriteCount" aria-label="0 家喜欢的店铺">0</b>
           </button>
-          <button class="text-button" id="locateButton" type="button">
+          <button class="text-button" id="locateButton" type="button" aria-label="找到我" title="定位到我附近">
             <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3" /><path d="M12 2v3M12 19v3M2 12h3M19 12h3" /></svg>
-            找到我
+            <span class="button-label">找到我</span>
           </button>
         </div>
       </header>
@@ -80,6 +80,7 @@
               </div>
               <div class="panel-heading-actions">
                 <span id="resultCount">0 家</span>
+                <button class="import-place-button" id="importPlaceButton" type="button">高德导入 ↗</button>
                 <button class="add-place-button" id="addPlaceButton" type="button">
                   <span aria-hidden="true">＋</span>
                   添加店铺
@@ -95,7 +96,7 @@
           </aside>
 
           <section class="map-panel" aria-label="美食地图">
-            <div id="map" role="application" aria-label="高德地图"></div>
+            <div id="map" role="application" aria-label="店铺地图"></div>
             <div class="map-fallback" id="mapFallback" hidden>
               <span>🗺️</span>
               <strong>地图暂时没有加载出来</strong>
@@ -121,6 +122,36 @@
           <button class="dialog-close" id="addPlaceClose" type="button" aria-label="关闭添加店铺窗口">×</button>
         </div>
 
+        <details class="amap-import" id="amapImportSection">
+          <summary>从高德分享链接导入店铺 <span aria-hidden="true">↓</span></summary>
+          <div class="amap-import-content">
+            <label class="form-field" for="amapShareInput">
+              <span>高德链接或完整分享文本</span>
+              <textarea id="amapShareInput" rows="4" maxlength="8000" placeholder="粘贴高德分享内容，包含店名、地址、人均和链接时可一并识别。"></textarea>
+            </label>
+            <div class="amap-import-actions">
+              <button class="import-parse-button" id="parseAmapButton" type="button">识别店铺信息</button>
+              <a href="https://www.amap.com/" target="_blank" rel="noopener noreferrer">打开高德选店 ↗</a>
+            </div>
+            <p class="import-status" id="amapImportStatus" role="status" aria-live="polite">含坐标链接可直接标记；短链接需在下方地图确认位置。</p>
+            <a class="amap-source-link" id="amapSourceLink" target="_blank" rel="noopener noreferrer" hidden>在高德查看这家店 ↗</a>
+            <div class="import-location" id="importLocationSection" hidden>
+              <div class="import-location-heading"><strong>确认店铺位置</strong><span id="importCoordinateLabel">点击地图放置标记</span></div>
+              <div class="import-map" id="importMap" aria-label="点击或拖动标记以确认店铺位置"></div>
+              <p class="form-help">可点击地图或拖动标记校准位置，保存后会立即显示在主地图。</p>
+            </div>
+            <label class="form-field import-coordinate-field" for="amapCoordinateInput">
+              <span>也可以粘贴高德坐标 <small>经度,纬度</small></span>
+              <div class="coordinate-entry"><input id="amapCoordinateInput" type="text" inputmode="decimal" placeholder="例如：113.884000,22.555000" /><button id="applyAmapCoordinateButton" type="button">定位</button></div>
+            </label>
+            <input id="importedLngInput" name="lng" type="hidden" />
+            <input id="importedLatInput" name="lat" type="hidden" />
+            <input id="importedSystemInput" name="coordinateSystem" type="hidden" />
+            <input id="importedPrecisionInput" name="locationPrecision" type="hidden" />
+            <input id="importedAmapUrlInput" name="amapUrl" type="hidden" />
+          </div>
+        </details>
+
         <div class="form-grid">
           <label class="form-field">
             <span>店铺名称 <em>必填</em></span>
@@ -144,7 +175,7 @@
 
           <label class="form-field">
             <span>人均消费 <small>选填</small></span>
-            <span class="input-prefix"><b>¥</b><input id="placePriceInput" name="price" type="number" min="0" max="99999" step="1" inputmode="numeric" placeholder="80" /></span>
+            <span class="input-prefix"><b>¥</b><input id="placePriceInput" name="price" type="number" min="0" max="99999" step="0.01" inputmode="decimal" placeholder="80" /></span>
           </label>
 
           <label class="form-field">
@@ -185,6 +216,7 @@
     <script src="./data/places.js"></script>
     <script src="./data/coordinates.js"></script>
     <script src="./data/community-places.js"></script>
+    <script src="./amap-import.js"></script>
     <script
       src="./vendor/leaflet.js"
     ></script>
